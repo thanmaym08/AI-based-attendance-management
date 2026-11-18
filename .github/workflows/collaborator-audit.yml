@@ -1,0 +1,53 @@
+name: Collaborator Commit & Architecture Audit
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+    branches: [ main, develop ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit-compliance:
+    name: Architecture & Privacy Compliance Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Collaborator Commit Audit
+        id: run_audit
+        run: |
+          python scripts/audit_collaborator_commits.py --max-commits 10
+
+      - name: DPDP Act Privacy Guardrail Check
+        run: |
+          echo "Checking for raw photo files mistakenly committed to git..."
+          FORBIDDEN_FILES=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -E '\.(jpg|jpeg|png|bmp|tiff|webp|heic)$' | grep -v '^docs/' || true)
+          if [ -n "$FORBIDDEN_FILES" ]; then
+            echo "::error::🚨 DPDP Act Violation! Raw face photos detected in commit:"
+            echo "$FORBIDDEN_FILES"
+            echo "Raw student face photos must NEVER be committed to Git. Only embeddings are permitted."
+            exit 1
+          else
+            echo "✅ No raw photo files detected."
+          fi
+
+      - name: Model Licence & Open Source Check
+        run: |
+          echo "Checking if dependencies were modified..."
+          CHANGED_DEPS=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD | grep -E '(requirements\.txt|pubspec\.yaml)' || true)
+          if [ -n "$CHANGED_DEPS" ]; then
+            echo "::warning::📋 Dependencies modified in: $CHANGED_DEPS. Please ensure all packages use OSI-approved open-source licences and are registered in docs/MODEL_LICENCE_REGISTER.md."
+          fi
