@@ -1,0 +1,75 @@
+# Recognition Engine Configuration
+# Edit thresholds here — no code changes needed for tuning
+
+recognition:
+  # Face detection
+  detection:
+    model: "yunet"                    # Options: yunet, retinaface
+    confidence_threshold: 0.8         # Minimum face detection confidence
+    nms_threshold: 0.3                # Non-max suppression
+    input_size: [320, 320]            # Detection input resolution
+
+  # Face embedding
+  embedding:
+    model: "sface"                    # Options: sface, mobilefacenet
+    embedding_dim: 128                # Dimension of face embedding vector
+    input_size: [112, 112]            # Face crop input size for embedding model
+
+  # Matching
+  matching:
+    similarity_metric: "cosine"       # Options: cosine, euclidean
+    roster_match_threshold: 0.45      # Tier 1: match against class roster
+    global_match_threshold: 0.40      # Tier 2: match against all students (slightly looser)
+    low_confidence_threshold: 0.55    # Below this = flagged for review
+    faiss_index_type: "IndexFlatIP"   # Exact cosine similarity
+
+  # Multi-photo merge
+  merge:
+    max_photos: 3                     # Maximum photos per session
+    dedup_threshold: 0.90             # Same face across photos if similarity > this
+    strategy: "best_confidence"       # Options: best_confidence, average
+
+  # Cross-section fraud detection (D11)
+  fraud_detection:
+    enabled: true
+    use_global_index: true            # Match unknowns against all enrolled students
+    intruder_alert_threshold: 0.40    # Confidence to flag as intruder (not just unknown)
+    notify_professor: true            # Include intruder details in API response
+    log_intruder_events: true         # Audit log for intruder detections
+
+# Preprocessing
+preprocessing:
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+  resize:
+    max_dimension: 1920               # Downscale photos larger than this
+  denoise:
+    enabled: false                    # Enable if classroom photos are noisy
+
+# Enrolment quality checks
+enrolment:
+  min_face_size: 112                  # Minimum face crop size in pixels
+  max_selfies: 3                      # Number of selfies per student
+  require_frontal: true               # At least one frontal face
+  eye_visibility_check: true          # Reject if eyes not visible
+  blur_detection: true                # Reject blurry selfies
+  blur_threshold: 100.0               # Laplacian variance threshold
+
+# Privacy & DPDP Act
+privacy:
+  delete_selfies_after_embedding: true
+  delete_class_photos_after_submit: true
+  encrypt_embeddings_at_rest: true
+  encryption_algorithm: "AES-256-GCM"
+  audit_log_enabled: true
+  data_retention_days: null           # null = until student requests deletion
+
+# Server
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1                          # 1 worker for ML (model loaded per worker)
+  cors_origins: ["*"]                 # Restrict in production
+  max_upload_size_mb: 20
